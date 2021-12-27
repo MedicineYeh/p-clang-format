@@ -78,10 +78,21 @@ function main()
         fi
     done
 
+    # Create and trap a temporary file
+    tmpfile=$(mktemp --tmpdir="${TMPDIR:-/tmp}" p-clang-format.XXXXXXXXXX)
+    trap 'rm -f -- "$tmpfile"' INT TERM HUP EXIT
+    # Append the temporary file to file_pathes so pragmas will be replaced in it
+    # (this handles the case when the user did not specify -i to edit files in-place)
+    file_pathes+=("$tmpfile")
+
+    # Replace "#pragma" -> "//#pragma" in the files
     replace_all "$pragma_prefix" "pragma_key_words[@]" "$comment_pattern" "file_pathes[@]"
-    format "$@"
+    # Run clang-format and redirect its output to the $tmpfile
+    format "$@" > "$tmpfile"
+    # Replace "//#pragma" -> "#pragma" in the files
     re_replace_all "$pragma_prefix" "pragma_key_words[@]" "$re_comment_pattern" "file_pathes[@]"
+    # Show the clang-format's stdout after replacement
+    cat "$tmpfile"
 }
 
 main "$@"
-
